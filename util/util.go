@@ -30,6 +30,16 @@ func GenWorkers(num int) chan<- func() {
 	return tasks
 }
 
+// Contains checks if there is an s in the slice
+func Contains(slice []string, s string) bool {
+	for _, ele := range slice {
+		if ele == s {
+			return true
+		}
+	}
+	return false
+}
+
 // AppendIfMissing append to the slice if missing
 func AppendIfMissing(slice []string, s string) []string {
 	for _, ele := range slice {

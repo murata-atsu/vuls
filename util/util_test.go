@@ -180,3 +180,27 @@ func Test_major(t *testing.T) {
 		}
 	}
 }
+
+func TestContains(t *testing.T) {
+	var tests = []struct {
+		slice    []string
+		s        string
+		expected bool
+	}{
+		{
+			slice:    []string{"foo"},
+			s:        "foo",
+			expected: true,
+		},
+		{
+			slice:    []string{"foo"},
+			s:        "bar",
+			expected: false,
+		},
+	}
+	for i, tt := range tests {
+		if a := Contains(tt.slice, tt.s); tt.expected != a {
+			t.Errorf("[%d]\nexpected: %t\n  actual: %t\n", i, tt.expected, a)
+		}
+	}
+}

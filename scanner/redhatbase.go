@@ -56,6 +56,7 @@ func detectRedhat(c config.ServerInfo) (bool, osTypeInterface) {
 			switch strings.ToLower(result[1]) {
 			case "centos", "centos linux", "centos stream":
 				cent := newCentOS(c)
+				cent.checkEnabledRepoList(release)
 				cent.setDistro(constant.CentOS, release)
 				return true, cent
 			case "alma", "almalinux":
@@ -81,6 +82,7 @@ func detectRedhat(c config.ServerInfo) (bool, osTypeInterface) {
 			switch strings.ToLower(result[1]) {
 			case "alma", "almalinux":
 				alma := newAlma(c)
+				alma.checkEnabledRepoList(release)
 				alma.setDistro(constant.Alma, release)
 				return true, alma
 			default:
@@ -102,6 +104,7 @@ func detectRedhat(c config.ServerInfo) (bool, osTypeInterface) {
 			switch strings.ToLower(result[1]) {
 			case "rocky", "rocky linux":
 				rocky := newRocky(c)
+				rocky.checkEnabledRepoList(release)
 				rocky.setDistro(constant.Rocky, release)
 				return true, rocky
 			default:
@@ -127,19 +130,33 @@ func detectRedhat(c config.ServerInfo) (bool, osTypeInterface) {
 			switch strings.ToLower(result[1]) {
 			case "centos", "centos linux", "centos stream":
 				cent := newCentOS(c)
+				cent.checkEnabledRepoList(release)
 				cent.setDistro(constant.CentOS, release)
 				return true, cent
 			case "alma", "almalinux":
 				alma := newAlma(c)
+				alma.checkEnabledRepoList(release)
 				alma.setDistro(constant.Alma, release)
 				return true, alma
 			case "rocky", "rocky linux":
 				rocky := newRocky(c)
+				rocky.checkEnabledRepoList(release)
 				rocky.setDistro(constant.Rocky, release)
 				return true, rocky
 			default:
 				// RHEL
 				rhel := newRHEL(c)
+				rhel.checkEnabledRepoList(release)
+				// detect EUS/AUS from enable repository list
+				for _, repo := range rhel.EnabledRepoList {
+					if strings.Contains(repo, "-aus-") {
+						release += "-aus"
+						break
+					} else if strings.Contains(repo, "-eus-") {
+						release += "-eus"
+						break
+					}
+				}
 				rhel.setDistro(constant.RedHat, release)
 				return true, rhel
 			}

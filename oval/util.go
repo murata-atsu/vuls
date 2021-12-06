@@ -98,6 +98,10 @@ type response struct {
 
 // getDefsByPackNameViaHTTP fetches OVAL information via HTTP
 func getDefsByPackNameViaHTTP(r *models.ScanResult, url string) (relatedDefs ovalResult, err error) {
+	ovalFamily, err := GetFamilyInOval(r.Family)
+	if err != nil {
+		return relatedDefs, err
+	}
 
 	nReq := len(r.Packages) + len(r.SrcPackages)
 	reqChan := make(chan request, nReq)
@@ -137,7 +141,7 @@ func getDefsByPackNameViaHTTP(r *models.ScanResult, url string) (relatedDefs ova
 				url, err := util.URLPathJoin(
 					url,
 					"packs",
-					r.Family,
+					ovalFamily,
 					r.Release,
 					req.packName,
 				)
@@ -151,13 +155,25 @@ func getDefsByPackNameViaHTTP(r *models.ScanResult, url string) (relatedDefs ova
 		}
 	}
 
+	var cpes []string
+	if ovalFamily == constant.RedHat {
+		url, _ := util.URLPathJoin(url, "repotocpe")
+		resp, body, errs := gorequest.New().Timeout(10 * time.Second).Post(url).Send(map[string][]string{"repositories": r.EnabledRepoList}).End()
+		if 0 < len(errs) || resp == nil || resp.StatusCode != 200 {
+			return relatedDefs, xerrors.Errorf("HTTP GET error, url: %s, resp: %v, err: %+v", url, resp, errs)
+		}
+		if err := json.Unmarshal([]byte(body), &cpes); err != nil {
+			return relatedDefs, xerrors.Errorf("Failed to Unmarshal. body: %s, err: %w", body, err)
+		}
+	}
+
 	timeout := time.After(2 * 60 * time.Second)
 	var errs []error
 	for i := 0; i < nReq; i++ {
 		select {
 		case res := <-resChan:
 			for _, def := range res.defs {
-				affected, notFixedYet, fixedIn, err := isOvalDefAffected(def, res.request, r.Family, r.RunningKernel, r.EnabledDnfModules)
+				affected, notFixedYet, fixedIn, err := isOvalDefAffected(def, res.request, r.Family, r.RunningKernel, r.EnabledDnfModules, cpes)
 				if err != nil {
 					errs = append(errs, err)
 					continue
@@ -262,13 +278,21 @@ func getDefsByPackNameFromOvalDB(driver db.DB, r *models.ScanResult) (relatedDef
 		return relatedDefs, err
 	}
 
+	var cpes []string
+	if ovalFamily == constant.RedHat {
+		cpes, err = driver.GetRepositoryCPE(r.EnabledRepoList)
+		if err != nil {
+			return relatedDefs, xerrors.Errorf("Failed to get RepositoryCPE. err: %w", err)
+		}
+	}
+
 	for _, req := range requests {
 		definitions, err := driver.GetByPackName(ovalFamily, r.Release, req.packName, req.arch)
 		if err != nil {
 			return relatedDefs, xerrors.Errorf("Failed to get %s OVAL info by package: %#v, err: %w", r.Family, req, err)
 		}
 		for _, def := range definitions {
-			affected, notFixedYet, fixedIn, err := isOvalDefAffected(def, req, ovalFamily, r.RunningKernel, r.EnabledDnfModules)
+			affected, notFixedYet, fixedIn, err := isOvalDefAffected(def, req, ovalFamily, r.RunningKernel, r.EnabledDnfModules, cpes)
 			if err != nil {
 				return relatedDefs, xerrors.Errorf("Failed to exec isOvalAffected. err: %w", err)
 			}
@@ -298,7 +322,7 @@ func getDefsByPackNameFromOvalDB(driver db.DB, r *models.ScanResult) (relatedDef
 	return
 }
 
-func isOvalDefAffected(def ovalmodels.Definition, req request, family string, running models.Kernel, enabledMods []string) (affected, notFixedYet bool, fixedIn string, err error) {
+func isOvalDefAffected(def ovalmodels.Definition, req request, family string, running models.Kernel, enabledMods []string, repoCPEs []string) (affected, notFixedYet bool, fixedIn string, err error) {
 	for _, ovalPack := range def.AffectedPacks {
 		if req.packName != ovalPack.Name {
 			continue
@@ -333,6 +357,22 @@ func isOvalDefAffected(def ovalmodels.Definition, req request, family string, ru
 			isModularityLabelEmptyOrSame = true
 		}
 		if !isModularityLabelEmptyOrSame {
+			continue
+		}
+
+		isAffectedDefinition := false
+		switch family {
+		case constant.RedHat, constant.CentOS, constant.Alma, constant.Rocky:
+			for _, affectedCPE := range def.Advisory.AffectedCPEList {
+				if util.Contains(repoCPEs, affectedCPE.Cpe) {
+					isAffectedDefinition = true
+					break
+				}
+			}
+		default:
+			isAffectedDefinition = true
+		}
+		if !isAffectedDefinition {
 			continue
 		}
 
