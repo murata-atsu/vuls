@@ -5,6 +5,7 @@ package gost
 
 import (
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -22,7 +23,7 @@ type RedHat struct {
 // DetectCVEs fills cve information that has in Gost
 func (red RedHat) DetectCVEs(r *models.ScanResult, ignoreWillNotFix bool) (nCVEs int, err error) {
 	if red.DBDriver.Cnf.IsFetchViaHTTP() {
-		prefix, _ := util.URLPathJoin(red.DBDriver.Cnf.GetURL(), "redhat", major(r.Release), "pkgs")
+		prefix, _ := util.URLPathJoin(red.DBDriver.Cnf.GetURL(), "redhat", r.Release, "pkgs")
 		responses, err := getAllUnfixedCvesViaHTTP(r, prefix)
 		if err != nil {
 			return 0, err
@@ -45,7 +46,7 @@ func (red RedHat) DetectCVEs(r *models.ScanResult, ignoreWillNotFix bool) (nCVEs
 		}
 		for _, pack := range r.Packages {
 			// CVE-ID: RedhatCVE
-			cves, err := red.DBDriver.DB.GetUnfixedCvesRedhat(major(r.Release), pack.Name, ignoreWillNotFix)
+			cves, err := red.DBDriver.DB.GetUnfixedCvesRedhat(r.Release, pack.Name, ignoreWillNotFix)
 			if err != nil {
 				return 0, err
 			}
@@ -141,8 +142,7 @@ func (red RedHat) setUnfixedCveToScanResult(cve *gostmodels.RedhatCVE, r *models
 		newly = true
 	}
 	v.Mitigations = append(v.Mitigations, mitigations...)
-	pkgStats := red.mergePackageStates(v,
-		cve.PackageState, r.Packages, r.Release)
+	pkgStats := red.mergePackageStates(v, cve.PackageState, r.Packages, r.Release)
 	if 0 < len(pkgStats) {
 		v.AffectedPackages = pkgStats
 		r.ScannedCves[cve.Name] = v
@@ -152,9 +152,17 @@ func (red RedHat) setUnfixedCveToScanResult(cve *gostmodels.RedhatCVE, r *models
 
 func (red RedHat) mergePackageStates(v models.VulnInfo, ps []gostmodels.RedhatPackageState, installed models.Packages, release string) (pkgStats models.PackageFixStatuses) {
 	pkgStats = v.AffectedPackages
+	var cpe string
+	if strings.HasSuffix(release, "-eus") {
+		cpe = fmt.Sprintf("cpe:/o:redhat:rhel_eus:%s", strings.TrimSuffix(release, "-eus"))
+	} else if strings.HasSuffix(release, "-aus") {
+		cpe = fmt.Sprintf("cpe:/o:redhat:rhel_aus:%s", strings.TrimSuffix(release, "-aus"))
+	} else {
+		cpe = fmt.Sprintf("cpe:/o:redhat:enterprise_linux:%s", major(release))
+	}
+
 	for _, pstate := range ps {
-		if pstate.Cpe !=
-			"cpe:/o:redhat:enterprise_linux:"+major(release) {
+		if pstate.Cpe != cpe {
 			return
 		}
 
