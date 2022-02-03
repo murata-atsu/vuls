@@ -21,9 +21,11 @@ import (
 	debver "github.com/knqyf263/go-deb-version"
 	rpmver "github.com/knqyf263/go-rpm-version"
 	"github.com/parnurzeal/gorequest"
-	"github.com/vulsio/goval-dictionary/db"
-	ovalmodels "github.com/vulsio/goval-dictionary/models"
 	"golang.org/x/xerrors"
+
+	ovaldb "github.com/vulsio/goval-dictionary/db"
+	ovalmodels "github.com/vulsio/goval-dictionary/models"
+	ovallog "github.com/vulsio/goval-dictionary/util"
 )
 
 type ovalResult struct {
@@ -243,7 +245,7 @@ func httpGet(url string, req request, resChan chan<- response, errChan chan<- er
 	}
 }
 
-func getDefsByPackNameFromOvalDB(driver db.DB, r *models.ScanResult) (relatedDefs ovalResult, err error) {
+func getDefsByPackNameFromOvalDB(r *models.ScanResult, driver ovaldb.DB) (relatedDefs ovalResult, err error) {
 	requests := []request{}
 	for _, pack := range r.Packages {
 		requests = append(requests, request{
@@ -465,29 +467,38 @@ func rhelRebuildOSVersionToRHEL(ver string) string {
 }
 
 // NewOVALClient returns a client for OVAL database
-func NewOVALClient(family string, cnf config.GovalDictConf) (Client, error) {
+func NewOVALClient(family string, cnf config.GovalDictConf, o logging.LogOpts) (Client, error) {
+	if err := ovallog.SetLogger(o.LogToFile, o.LogDir, o.Debug, o.LogJSON); err != nil {
+		return nil, err
+	}
+
+	driver, err := newOvalDB(&cnf)
+	if err != nil {
+		return nil, xerrors.Errorf("Failed to newOvalDB. err: %w", err)
+	}
+
 	switch family {
 	case constant.Debian, constant.Raspbian:
-		return NewDebian(&cnf), nil
+		return NewDebian(driver, cnf.GetURL()), nil
 	case constant.Ubuntu:
-		return NewUbuntu(&cnf), nil
+		return NewUbuntu(driver, cnf.GetURL()), nil
 	case constant.RedHat:
-		return NewRedhat(&cnf), nil
+		return NewRedhat(driver, cnf.GetURL()), nil
 	case constant.CentOS:
-		return NewCentOS(&cnf), nil
+		return NewCentOS(driver, cnf.GetURL()), nil
 	case constant.Alma:
-		return NewAlma(&cnf), nil
+		return NewAlma(driver, cnf.GetURL()), nil
 	case constant.Rocky:
-		return NewRocky(&cnf), nil
+		return NewRocky(driver, cnf.GetURL()), nil
 	case constant.Oracle:
-		return NewOracle(&cnf), nil
+		return NewOracle(driver, cnf.GetURL()), nil
 	case constant.SUSEEnterpriseServer:
 		// TODO other suse family
-		return NewSUSE(&cnf), nil
+		return NewSUSE(driver, cnf.GetURL()), nil
 	case constant.Alpine:
-		return NewAlpine(&cnf), nil
+		return NewAlpine(driver, cnf.GetURL()), nil
 	case constant.Amazon:
-		return NewAmazon(&cnf), nil
+		return NewAmazon(driver, cnf.GetURL()), nil
 	case constant.FreeBSD, constant.Windows:
 		return nil, nil
 	case constant.ServerTypePseudo:
