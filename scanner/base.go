@@ -70,9 +70,6 @@ type osPackages struct {
 	// installed source packages (Debian based only)
 	SrcPackages models.SrcPackages
 
-	// enabled dnf modules or packages
-	EnabledDnfModules []string
-
 	// Detected Vulnerabilities Key: CVE-ID
 	VulnInfos models.VulnInfos
 
@@ -482,7 +479,6 @@ func (l *base) convertToModel() models.ScanResult {
 		RunningKernel:     l.Kernel,
 		Packages:          l.Packages,
 		SrcPackages:       l.SrcPackages,
-		EnabledDnfModules: l.EnabledDnfModules,
 		WordPressPackages: l.WordPress,
 		LibraryScanners:   l.LibraryScanners,
 		Optional:          l.ServerInfo.Optional,

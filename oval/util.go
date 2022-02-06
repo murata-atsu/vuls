@@ -5,6 +5,7 @@ package oval
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"regexp"
 	"sort"
@@ -114,6 +115,7 @@ func getDefsByPackNameViaHTTP(r *models.ScanResult, url string) (relatedDefs ova
 				newVersionRelease: pack.FormatVer(),
 				isSrcPack:         false,
 				arch:              pack.Arch,
+				modularityLabel:   pack.ModularityLabel,
 			}
 		}
 		for _, pack := range r.SrcPackages {
@@ -123,6 +125,7 @@ func getDefsByPackNameViaHTTP(r *models.ScanResult, url string) (relatedDefs ova
 				versionRelease:  pack.Version,
 				isSrcPack:       true,
 				// arch:            pack.Arch,
+				// modularityLabel: pack.ModularityLabel,
 			}
 		}
 	}()
@@ -164,7 +167,7 @@ func getDefsByPackNameViaHTTP(r *models.ScanResult, url string) (relatedDefs ova
 		select {
 		case res := <-resChan:
 			for _, def := range res.defs {
-				affected, notFixedYet, fixedIn, err := isOvalDefAffected(def, res.request, ovalFamily, r.RunningKernel, r.EnabledDnfModules)
+				affected, notFixedYet, fixedIn, err := isOvalDefAffected(def, res.request, ovalFamily, r.RunningKernel)
 				if err != nil {
 					errs = append(errs, err)
 					continue
@@ -251,6 +254,7 @@ func getDefsByPackNameFromOvalDB(driver db.DB, r *models.ScanResult) (relatedDef
 			versionRelease:    pack.FormatVer(),
 			newVersionRelease: pack.FormatNewVer(),
 			arch:              pack.Arch,
+			modularityLabel:   pack.ModularityLabel,
 			isSrcPack:         false,
 		})
 	}
@@ -260,7 +264,8 @@ func getDefsByPackNameFromOvalDB(driver db.DB, r *models.ScanResult) (relatedDef
 			binaryPackNames: pack.BinaryNames,
 			versionRelease:  pack.Version,
 			arch:            pack.Arch,
-			isSrcPack:       true,
+			// modularityLabel: pack.ModularityLabel,
+			isSrcPack: true,
 		})
 	}
 
@@ -278,7 +283,7 @@ func getDefsByPackNameFromOvalDB(driver db.DB, r *models.ScanResult) (relatedDef
 			return relatedDefs, xerrors.Errorf("Failed to get %s OVAL info by package: %#v, err: %w", r.Family, req, err)
 		}
 		for _, def := range definitions {
-			affected, notFixedYet, fixedIn, err := isOvalDefAffected(def, req, ovalFamily, r.RunningKernel, r.EnabledDnfModules)
+			affected, notFixedYet, fixedIn, err := isOvalDefAffected(def, req, ovalFamily, r.RunningKernel)
 			if err != nil {
 				return relatedDefs, xerrors.Errorf("Failed to exec isOvalAffected. err: %w", err)
 			}
@@ -308,7 +313,7 @@ func getDefsByPackNameFromOvalDB(driver db.DB, r *models.ScanResult) (relatedDef
 	return
 }
 
-func isOvalDefAffected(def ovalmodels.Definition, req request, family string, running models.Kernel, enabledMods []string) (affected, notFixedYet bool, fixedIn string, err error) {
+func isOvalDefAffected(def ovalmodels.Definition, req request, family string, running models.Kernel) (affected, notFixedYet bool, fixedIn string, err error) {
 	for _, ovalPack := range def.AffectedPacks {
 		if req.packName != ovalPack.Name {
 			continue
@@ -331,19 +336,18 @@ func isOvalDefAffected(def ovalmodels.Definition, req request, family string, ru
 			continue
 		}
 
-		isModularityLabelEmptyOrSame := false
-		if ovalPack.ModularityLabel != "" {
-			for _, mod := range enabledMods {
-				if mod == ovalPack.ModularityLabel {
-					isModularityLabelEmptyOrSame = true
-					break
-				}
-			}
-		} else {
-			isModularityLabelEmptyOrSame = true
-		}
-		if !isModularityLabelEmptyOrSame {
+		if ovalPack.ModularityLabel != "" && req.modularityLabel == "" {
 			continue
+		} else if ovalPack.ModularityLabel == "" && req.modularityLabel != "" {
+			continue
+		} else if ovalPack.ModularityLabel != "" && req.modularityLabel != "" {
+			ss := strings.Split(ovalPack.ModularityLabel, ":")
+			ovalModularityNameStreamLabel := fmt.Sprintf("%s:%s", ss[0], ss[1])
+			ss = strings.Split(req.modularityLabel, ":")
+			reqModularityNameStreamLabel := fmt.Sprintf("%s:%s", ss[0], ss[1])
+			if ovalModularityNameStreamLabel != reqModularityNameStreamLabel {
+				continue
+			}
 		}
 
 		if running.Release != "" {

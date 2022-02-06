@@ -203,7 +203,6 @@ func TestIsOvalDefAffected(t *testing.T) {
 		req    request
 		family string
 		kernel models.Kernel
-		mods   []string
 	}
 	var tests = []struct {
 		in          in
@@ -1560,11 +1559,9 @@ func TestIsOvalDefAffected(t *testing.T) {
 					},
 				},
 				req: request{
-					packName:       "nginx",
-					versionRelease: "1.16.0-1.module+el8.3.0+8844+e5e7039f.1",
-				},
-				mods: []string{
-					"nginx:1.16",
+					packName:        "nginx",
+					versionRelease:  "1.16.0-1.module+el8.3.0+8844+e5e7039f.1",
+					modularityLabel: "nginx:1.16:version:context",
 				},
 			},
 			affected:    true,
@@ -1586,11 +1583,9 @@ func TestIsOvalDefAffected(t *testing.T) {
 					},
 				},
 				req: request{
-					packName:       "nginx",
-					versionRelease: "1.16.2-1.module+el8.3.0+8844+e5e7039f.1",
-				},
-				mods: []string{
-					"nginx:1.16",
+					packName:        "nginx",
+					versionRelease:  "1.16.2-1.module+el8.3.0+8844+e5e7039f.1",
+					modularityLabel: "nginx:1.16:version:context",
 				},
 			},
 			affected:    false,
@@ -1611,11 +1606,9 @@ func TestIsOvalDefAffected(t *testing.T) {
 					},
 				},
 				req: request{
-					packName:       "nginx",
-					versionRelease: "1.16.0-1.module+el8.3.0+8844+e5e7039f.1",
-				},
-				mods: []string{
-					"nginx:1.14",
+					packName:        "nginx",
+					versionRelease:  "1.16.0-1.module+el8.3.0+8844+e5e7039f.1",
+					modularityLabel: "nginx:1.14:version:context",
 				},
 			},
 			affected:    false,
@@ -1777,7 +1770,7 @@ func TestIsOvalDefAffected(t *testing.T) {
 	}
 
 	for i, tt := range tests {
-		affected, notFixedYet, fixedIn, err := isOvalDefAffected(tt.in.def, tt.in.req, tt.in.family, tt.in.kernel, tt.in.mods)
+		affected, notFixedYet, fixedIn, err := isOvalDefAffected(tt.in.def, tt.in.req, tt.in.family, tt.in.kernel)
 		if tt.wantErr != (err != nil) {
 			t.Errorf("[%d] err\nexpected: %t\n  actual: %s\n", i, tt.wantErr, err)
 		}
