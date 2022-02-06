@@ -342,8 +342,16 @@ func isOvalDefAffected(def ovalmodels.Definition, req request, family string, ru
 			continue
 		} else if ovalPack.ModularityLabel != "" && req.modularityLabel != "" {
 			ss := strings.Split(ovalPack.ModularityLabel, ":")
+			if len(ss) < 2 {
+				logging.Log.Warnf("Invalid modularitylabel format in oval package. Maybe it is necessary to fix modularitylabel of goval-dictionary. expected: ${name}:${stream}(:${version}:${context}:${arch}), actual: %s", ovalPack.ModularityLabel)
+				continue
+			}
 			ovalModularityNameStreamLabel := fmt.Sprintf("%s:%s", ss[0], ss[1])
 			ss = strings.Split(req.modularityLabel, ":")
+			if len(ss) < 2 {
+				logging.Log.Warnf("Invalid modularitylabel format in req package. Maybe it is necessary to fix modularitylabel of rpm. expected: ${name}:${stream}(:${version}:${context}:${arch}), actual: %s", ovalPack.ModularityLabel)
+				continue
+			}
 			reqModularityNameStreamLabel := fmt.Sprintf("%s:%s", ss[0], ss[1])
 			if ovalModularityNameStreamLabel != reqModularityNameStreamLabel {
 				continue
