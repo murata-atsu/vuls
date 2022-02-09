@@ -379,7 +379,10 @@ func isOvalDefAffected(def ovalmodels.Definition, req request, family string, ru
 			switch family {
 			case constant.RedHat,
 				constant.Amazon,
+				constant.OpenSUSE,
+				constant.OpenSUSELeap,
 				constant.SUSEEnterpriseServer,
+				constant.SUSEEnterpriseDesktop,
 				constant.Debian,
 				constant.Ubuntu,
 				constant.Raspbian,
@@ -439,7 +442,10 @@ func lessThan(family, newVer string, packInOVAL ovalmodels.Package) (bool, error
 		return vera.LessThan(verb), nil
 
 	case constant.Oracle,
+		constant.OpenSUSE,
+		constant.OpenSUSELeap,
 		constant.SUSEEnterpriseServer,
+		constant.SUSEEnterpriseDesktop,
 		constant.Amazon:
 		vera := rpmver.NewVersion(newVer)
 		verb := rpmver.NewVersion(packInOVAL.Version)
@@ -481,9 +487,14 @@ func NewOVALClient(family string, cnf config.GovalDictConf) (Client, error) {
 		return NewRocky(&cnf), nil
 	case constant.Oracle:
 		return NewOracle(&cnf), nil
+	case constant.OpenSUSE:
+		return NewSUSE(&cnf, constant.OpenSUSE), nil
+	case constant.OpenSUSELeap:
+		return NewSUSE(&cnf, constant.OpenSUSELeap), nil
 	case constant.SUSEEnterpriseServer:
-		// TODO other suse family
-		return NewSUSE(&cnf), nil
+		return NewSUSE(&cnf, constant.SUSEEnterpriseServer), nil
+	case constant.SUSEEnterpriseDesktop:
+		return NewSUSE(&cnf, constant.SUSEEnterpriseDesktop), nil
 	case constant.Alpine:
 		return NewAlpine(&cnf), nil
 	case constant.Amazon:
@@ -512,9 +523,14 @@ func GetFamilyInOval(familyInScanResult string) (string, error) {
 		return constant.RedHat, nil
 	case constant.Oracle:
 		return constant.Oracle, nil
+	case constant.OpenSUSE:
+		return constant.OpenSUSE, nil
+	case constant.OpenSUSELeap:
+		return constant.OpenSUSELeap, nil
 	case constant.SUSEEnterpriseServer:
-		// TODO other suse family
 		return constant.SUSEEnterpriseServer, nil
+	case constant.SUSEEnterpriseDesktop:
+		return constant.SUSEEnterpriseDesktop, nil
 	case constant.Alpine:
 		return constant.Alpine, nil
 	case constant.Amazon:

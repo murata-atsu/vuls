@@ -19,7 +19,7 @@ type suse struct {
 	redhatBase
 }
 
-// NewRedhat is constructor
+// newSUSE is constructor
 func newSUSE(c config.ServerInfo) *suse {
 	r := &suse{
 		redhatBase: redhatBase{
@@ -53,7 +53,6 @@ func detectSUSE(c config.ServerInfo) (bool, osTypeInterface) {
 				re := regexp.MustCompile(`openSUSE (\d+\.\d+|\d+)`)
 				result := re.FindStringSubmatch(strings.TrimSpace(r.Stdout))
 				if len(result) == 2 {
-					//TODO check opensuse or opensuse.leap
 					s := newSUSE(c)
 					s.setDistro(constant.OpenSUSE, result[1])
 					return true, s
@@ -67,8 +66,7 @@ func detectSUSE(c config.ServerInfo) (bool, osTypeInterface) {
 					result = re.FindStringSubmatch(strings.TrimSpace(r.Stdout))
 					if len(result) == 2 {
 						s := newSUSE(c)
-						s.setDistro(constant.SUSEEnterpriseServer,
-							fmt.Sprintf("%s.%s", version, result[1]))
+						s.setDistro(constant.SUSEEnterpriseServer, fmt.Sprintf("%s.%s", version, result[1]))
 						return true, s
 					}
 				}
@@ -82,9 +80,12 @@ func detectSUSE(c config.ServerInfo) (bool, osTypeInterface) {
 }
 
 func (o *suse) parseOSRelease(content string) (name string, ver string) {
-	if strings.Contains(content, "ID=opensuse") {
-		//TODO check opensuse or opensuse.leap
-		name = constant.OpenSUSE
+	if strings.Contains(content, `ID="opensuse`) {
+		if strings.Contains(content, `ID="opensuse-leap"`) {
+			name = constant.OpenSUSELeap
+		} else {
+			name = constant.OpenSUSE
+		}
 	} else if strings.Contains(content, `NAME="SLES"`) {
 		name = constant.SUSEEnterpriseServer
 	} else if strings.Contains(content, `NAME="SLES_SAP"`) {
@@ -176,13 +177,14 @@ func (o *suse) scanUpdatablePackages() (models.Packages, error) {
 	return o.parseZypperLULines(r.Stdout)
 }
 
+var warnRepoPattern = regexp.MustCompile(`Warning: Repository '.+' appears to be outdated\. Consider using a different mirror or server\.`)
+
 func (o *suse) parseZypperLULines(stdout string) (models.Packages, error) {
 	updatables := models.Packages{}
 	scanner := bufio.NewScanner(strings.NewReader(stdout))
 	for scanner.Scan() {
 		line := scanner.Text()
-		if strings.Index(line, "S | Repository") != -1 ||
-			strings.Index(line, "--+----------------") != -1 {
+		if strings.Contains(line, "S | Repository") || strings.Contains(line, "--+----------------") || warnRepoPattern.MatchString(line) {
 			continue
 		}
 		pack, err := o.parseZypperLUOneLine(line)

@@ -502,8 +502,7 @@ func (o *redhatBase) isExecYumPS() bool {
 		constant.OpenSUSE,
 		constant.OpenSUSELeap,
 		constant.SUSEEnterpriseServer,
-		constant.SUSEEnterpriseDesktop,
-		constant.SUSEOpenstackCloud:
+		constant.SUSEEnterpriseDesktop:
 		return false
 	}
 	return !o.getServerInfo().Mode.IsFast()
@@ -514,8 +513,7 @@ func (o *redhatBase) isExecNeedsRestarting() bool {
 	case constant.OpenSUSE,
 		constant.OpenSUSELeap,
 		constant.SUSEEnterpriseServer,
-		constant.SUSEEnterpriseDesktop,
-		constant.SUSEOpenstackCloud:
+		constant.SUSEEnterpriseDesktop:
 		// TODO zypper ps
 		// https://github.com/future-architect/vuls/issues/696
 		return false
@@ -666,7 +664,32 @@ func (o *redhatBase) rpmQa() string {
 	const old = `rpm -qa --queryformat "%{NAME} %{EPOCH} %{VERSION} %{RELEASE} %{ARCH}\n"`
 	const new = `rpm -qa --queryformat "%{NAME} %{EPOCHNUM} %{VERSION} %{RELEASE} %{ARCH}\n"`
 	switch o.Distro.Family {
-	case constant.SUSEEnterpriseServer:
+	case constant.OpenSUSE:
+		if o.Distro.Release == "tumbleweed" {
+			return new
+		}
+		switch v, _ := o.Distro.MajorVersion(); v {
+		case 13:
+			return old // ?
+		case 12:
+			return old // ?
+		case 11:
+			return old // ?
+		case 10:
+			return old // ?
+		default:
+			return old
+		}
+	case constant.OpenSUSELeap:
+		switch v, _ := o.Distro.MajorVersion(); v {
+		case 15:
+			return new
+		case 42:
+			return old // ?
+		default:
+			return old
+		}
+	case constant.SUSEEnterpriseServer, constant.SUSEEnterpriseDesktop:
 		if v, _ := o.Distro.MajorVersion(); v < 12 {
 			return old
 		}
@@ -683,7 +706,32 @@ func (o *redhatBase) rpmQf() string {
 	const old = `rpm -qf --queryformat "%{NAME} %{EPOCH} %{VERSION} %{RELEASE} %{ARCH}\n" `
 	const new = `rpm -qf --queryformat "%{NAME} %{EPOCHNUM} %{VERSION} %{RELEASE} %{ARCH}\n" `
 	switch o.Distro.Family {
-	case constant.SUSEEnterpriseServer:
+	case constant.OpenSUSE:
+		if o.Distro.Release == "tumbleweed" {
+			return new
+		}
+		switch v, _ := o.Distro.MajorVersion(); v {
+		case 13:
+			return old // ?
+		case 12:
+			return old // ?
+		case 11:
+			return old // ?
+		case 10:
+			return old // ?
+		default:
+			return old
+		}
+	case constant.OpenSUSELeap:
+		switch v, _ := o.Distro.MajorVersion(); v {
+		case 15:
+			return new
+		case 42:
+			return old // ?
+		default:
+			return old
+		}
+	case constant.SUSEEnterpriseServer, constant.SUSEEnterpriseDesktop:
 		if v, _ := o.Distro.MajorVersion(); v < 12 {
 			return old
 		}
